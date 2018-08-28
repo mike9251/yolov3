@@ -8,7 +8,7 @@ from torch.autograd import Variable
 import numpy as np
 
 def get_test_input():
-    img = cv2.imread("dog-cycle-car.png")
+    img = cv2.imread("imgs/dog-cycle-car.png")
     img = cv2.resize(img, (416,416))          #Resize to the input dimension
     img_ =  img[:,:,::-1].transpose((2,0,1))  # BGR -> RGB | H X W C -> C X H X W 
     img_ = img_[np.newaxis,:,:,:]/255.0       #Add a channel at 0 (for batch) | Normalise
@@ -55,6 +55,19 @@ class DetectionLayer(nn.Module):
         super(DetectionLayer, self).__init__()
         self.anchors = anchors
 
+class MaxPoolStride1(nn.Module):
+	def __init__(self, kernel_size):
+		super(MaxPoolStride1, self).__init__()
+		self.kernel_size = kernel_size
+		self.pad = kernel_size - 1
+
+	def forward(self, x):
+		print("\n\nBefore PAD x.shape = ", x.shape)
+		padded_x = F.pad(x, (0,self.pad,0,self.pad), mode="replicate")
+		print("\nAFter PAD x.shape = ", padded_x.shape)
+		pooled_x = nn.MaxPool2d(self.kernel_size, self.pad)(padded_x)
+		return pooled_x
+
 def create_modules(blocks):
 	net_info = blocks[0]     #Captures the information about the input and pre-processing    
 	module_list = nn.ModuleList()
@@ -97,6 +110,19 @@ def create_modules(blocks):
 			if (activation == 'leaky'):
 				activ = nn.LeakyReLU(0.1, inplace = True)
 				module.add_module('leaky_{0}'.format(index), activ)
+			# Tiny model
+			elif (activation == 'linear'):
+				activ = nn.ReLU(inplace = True)
+				module.add_module('ReLU_{0}'.format(index), activ)
+		# Tiny model
+		elif (x['type'] == 'maxpool'):
+			kernel = int(x['size'])
+			stride = int(x['stride'])
+			if (stride != 1):
+				maxpool = nn.MaxPool2d(kernel, stride = stride)
+			else:
+				maxpool = MaxPoolStride1(kernel)
+			module.add_module('maxpool_{0}'.format(index), maxpool)
 
 		elif (x['type'] == 'upsample'):
 			#upsample = nn.Upsample(scale_factor = 2, mode = 'bilinear')
@@ -166,20 +192,29 @@ class Darknet(nn.Module):
 
 			#print(i, module_type, '\n')
 
-			if (module_type == 'convolutional'):# or module_type == 'upsample'):
+			if (module_type == 'convolutional' or module_type == 'maxpool'):
+				print("module # ", i, module_type)
+				print("Before x.shape ", x.shape)
 				x = self.module_list[i](x)
+				print("After x.shape ", x.shape)
 
 			elif (module_type == 'upsample'):
+				print("module # ", i, module_type)
+				print("Before Upsamle: x.shape = ", x.shape)
 				x = F.interpolate(x, scale_factor = 2, mode='bilinear', align_corners=True)
+				print("After Upsamle: x.shape = ", x.shape)
 
 			elif (module_type == 'route'):
+				print("module # ", i, module_type)
 				layers = [int(layer) for layer in module['layers']]
+				print("layers: ", layers)
 
 				if (layers[0] > 0):
 					layers[0] = layers[0] - i
 
 				if (len(layers) == 1):
 					x = outputs[i + layers[0]]
+					print("x.shape = ", x.shape)
 
 				else:
 					if (layers[1] > 0):
@@ -188,6 +223,8 @@ class Darknet(nn.Module):
 					map1 = outputs[i + layers[0]]
 					map2 = outputs[i + layers[1]]
 
+					print("map1.shape  ", map1.shape, '\n', "map2.shape = ", map2.shape)
+
 					x = torch.cat((map1, map2), 1)
 
 			elif (module_type == 'shortcut'):
@@ -195,12 +232,15 @@ class Darknet(nn.Module):
 				x = outputs[i - 1] + outputs[i + from_]
 
 			elif (module_type == 'yolo'):
+				print("module # ", i, module_type)
 				anchors = self.module_list[i][0].anchors
 				input_dim = int(self.net_info['height'])
 
 				num_classes = int(module['classes'])
 
 				x = x.data
+
+				print("YOLO. x.shape = ", i, x.shape)
 				x = predict_transform(x, input_dim, anchors, num_classes, CUDA)
 
 				if not write:
@@ -314,3 +354,18 @@ if pred is not 0:
 	print("Pred shape after NMS: ", pred.shape)
 else:
 	print("There is no detections")"""
+
+model = Darknet("cfg/yolov3-tiny.cfg")
+print(model)
+model.load_weights("model/yolov3-tiny.weights")
+inp = get_test_input()
+#print(model)
+pred = model(inp, torch.cuda.is_available())
+print(pred.shape, pred)
+
+print("Pred shape before NMS: ", pred.shape)
+pred = write_result(pred, 0.6, 80, 0.5)
+if pred is not 0:
+	print("Pred shape after NMS: ", pred.shape)
+else:
+	print("There is no detections")

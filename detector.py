@@ -208,10 +208,10 @@ list(map(lambda x: draw_boxes(x, loaded_img), output))
 #print("det_names = ", osp.realpath('.')+'\\'+args.det+img_list[0])
 det_names = []
 for i, name in enumerate(img_list):
-	det_name = '\\det\\det_' + name.split('\\')[-1]
+	det_name = '/det/det_' + name.split('/')[-1]
 
-	det_names.append('\\'.join(name.split('\\')[:-1]) + det_name)
-	det_name = '\\'.join(name.split('\\')[:-2]) + det_name
+	det_names.append('/'.join(name.split('/')[:-1]) + det_name)
+	det_name = '/'.join(name.split('/')[:-2]) + det_name
 
 	cv2.imwrite(det_name, loaded_img[i])
 
