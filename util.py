@@ -97,9 +97,7 @@ def bbox_iou(box1, box2):
 def write_result(prediction, conf, num_classes, nms_conf = 0.4):
 	# conf - objectness score threshold
 	# nms_conf - IoU threshold
-	print("Before maask: ", (prediction[:, :, 4] > conf).shape)
 	conf_mask = (prediction[:, :, 4] > conf).float().unsqueeze(2)
-	print("After mask: ", conf_mask.shape)
 	prediction = prediction * conf_mask
 
 	# Convert x,y,h,w parameters of bb to tlx, tly, brx, bry
@@ -137,7 +135,7 @@ def write_result(prediction, conf, num_classes, nms_conf = 0.4):
 	for ind in range(batch_size):
 		pred = prediction[ind]
 
-		print("pred.shape = ", pred.shape)
+		#print("pred.shape = ", pred.shape)
 
 		# For this step we replace class scores (80) with max scores over each box
 		#max_conf - the biggest class score in the box
@@ -146,25 +144,16 @@ def write_result(prediction, conf, num_classes, nms_conf = 0.4):
 		max_conf = max_conf.float().unsqueeze(1)
 		max_conf_ind = max_conf_ind.float().unsqueeze(1)
 
-		print("max_conf.shape = ", max_conf.shape)
-
 		# First 5 parameters: bb and objectness score, last 2: max class score + index of the class
 		seq = (pred[:, :5], max_conf, max_conf_ind)
 		pred = torch.cat(seq, 1)
 
-		print("pred.shape = ", pred.shape)
-
 		# Get rid of zeroed boxes (previously, if objectness score < conf)
 		non_zero_ind = torch.nonzero(pred[:, 4])
 
-		print(non_zero_ind)
-
-		print("Pred: \n", pred[non_zero_ind[0]])
-		print("Pred")
 		# To handle situations when there are no detections use try-except
 		try:
 			pred_ = pred[non_zero_ind.unsqueeze(0), :].view(-1, 7)
-			print("From try!")
 		except:
 			continue
 
@@ -175,11 +164,8 @@ def write_result(prediction, conf, num_classes, nms_conf = 0.4):
 		# -1 index holds the class index
 		img_classes = unique(pred_[:,-1])
 
-		print("# of classes: ", img_classes)
-
 		# loop over detected classes in the image
 		for class_ind in img_classes:
-			print("# class: ", class_ind)
 			# perform NMS
 			# Get the detections with a particular class
 			class_mask = pred_ * (pred_[:, -1] == class_ind).float().unsqueeze(1)
@@ -233,7 +219,7 @@ def load_classes(file):
 	names = f.read().split('\n')[:-1] # -1 to exclude the last line ''
 	return names
 
-def letterbox_image(img, ind_dim):
+def letterbox_image(img, inp_dim):
 	img_w, img_h = img.shape[1], img.shape[0]
 	w, h = inp_dim
 	new_w = int(img_w * min(w/img_w, h/img_h))
@@ -241,7 +227,7 @@ def letterbox_image(img, ind_dim):
 
 	resized_img = cv2.resize(img, (new_w, new_h), interpolation = cv2.INTER_CUBIC)
 
-	result = np.fill((w, h, 3), 128)
+	result = np.full((w, h, 3), 128)
 
 	result[(h-new_h)//2:(h-new_h)//2 + new_h, (w-new_w)//2:(w-new_w)//2 + new_w, :] = resized_img
 
@@ -253,7 +239,8 @@ def prep_image(img, inp_dim):
 
 	Returns a Variable 
 	"""
-	img = cv2.resize(img, (inp_dim, inp_dim))
+	#img = cv2.resize(img, (inp_dim, inp_dim))
+	img = letterbox_image(img, (inp_dim, inp_dim))
 	# From BGR image form a C x H x W tensor
 	img = img[:, :, ::-1].transpose((2, 0, 1)).copy()
 	# Create Variable with 1 x C x H x W dims

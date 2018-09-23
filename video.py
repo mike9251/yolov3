@@ -1,22 +1,14 @@
 import time
 import torch 
-#import torch.nn as nn
-#from torch.autograd import Variable
 import numpy as np
 import cv2 
 from util import *
 import argparse
-#import os 
-#import os.path as osp
-from darknet import Darknet
-import pickle as pkl
-#import pandas as pd
 import random
 import os 
 import os.path as osp
 from darknet import Darknet
 import pickle as pkl
-import pandas as pd
 import random
 
 def arg_parse():
@@ -82,10 +74,15 @@ def process_video():
 
 		im_dim = frame.shape[1], frame.shape[0]
 		im_dim = torch.FloatTensor(im_dim).repeat(1,2)
-		print("im_dim shape = ", im_dim.shape)
+
+		if CUDA:
+			im_dim = im_dim.cuda()
 
 		img = prep_image(frame, input_dim)
-		#cv2.imshow("result", frame)
+		cv2.imshow("result", frame)
+
+		if CUDA:
+			img = img.cuda()
 
 		with torch.no_grad():
 			prediction = model(Variable(img), CUDA)
@@ -94,7 +91,7 @@ def process_video():
 
 		if (type(output) == int):
 			cv2.imshow("result", frame)
-			frame += 1
+			nframe += 1
 			print("FPS = {:5.2f}".format(nframe / (time.time() - start)))
 			if cv2.waitKey(1) & 0xFF == ord('q'):
 				break
@@ -102,8 +99,6 @@ def process_video():
 
 		im_dim = im_dim.repeat(output.size(0), 1)
 		scaling_factor = torch.min(input_dim/im_dim, 1)[0].view(-1, 1)
-
-		print("Scale = ", scaling_factor)
 
 		output[:, [1, 3]] -= (input_dim - scaling_factor * im_dim[:, 0].view(-1, 1))/2
 		output[:, [2, 4]] -= (input_dim - scaling_factor * im_dim[:, 1].view(-1, 1))/2
@@ -118,12 +113,8 @@ def process_video():
 			i, pred = x
 			tl = tuple(pred[1:3].int())
 			br = tuple(pred[3:5].int())
-			print("tl = ", tl)
-			print("br = ", br)
 
-			print("pred.shape = ", pred.shape)
-			#print("Pred[0] = ", pred[0])
-			#print("Pred[1] = ", pred[1])
+			#print("pred.shape = ", pred.shape)
 
 			img = image#[int(x[0])]
 
@@ -146,7 +137,7 @@ def process_video():
 		#out.write(result)
 		if cv2.waitKey(1) & 0xFF == ord('q'):
 			break
-		frame += 1
+		nframe += 1
 		print("FPS = {:5.2f}".format(nframe / (time.time() - start)))
 
 	cap.release()

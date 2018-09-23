@@ -62,9 +62,7 @@ class MaxPoolStride1(nn.Module):
 		self.pad = kernel_size - 1
 
 	def forward(self, x):
-		print("\n\nBefore PAD x.shape = ", x.shape)
 		padded_x = F.pad(x, (0,self.pad,0,self.pad), mode="replicate")
-		print("\nAFter PAD x.shape = ", padded_x.shape)
 		pooled_x = nn.MaxPool2d(self.kernel_size, self.pad)(padded_x)
 		return pooled_x
 
@@ -190,31 +188,20 @@ class Darknet(nn.Module):
 		for i, module in enumerate(modules):
 			module_type = (module['type'])
 
-			#print(i, module_type, '\n')
-
 			if (module_type == 'convolutional' or module_type == 'maxpool'):
-				print("module # ", i, module_type)
-				print("Before x.shape ", x.shape)
 				x = self.module_list[i](x)
-				print("After x.shape ", x.shape)
 
 			elif (module_type == 'upsample'):
-				print("module # ", i, module_type)
-				print("Before Upsamle: x.shape = ", x.shape)
 				x = F.interpolate(x, scale_factor = 2, mode='bilinear', align_corners=True)
-				print("After Upsamle: x.shape = ", x.shape)
 
 			elif (module_type == 'route'):
-				print("module # ", i, module_type)
 				layers = [int(layer) for layer in module['layers']]
-				print("layers: ", layers)
 
 				if (layers[0] > 0):
 					layers[0] = layers[0] - i
 
 				if (len(layers) == 1):
 					x = outputs[i + layers[0]]
-					print("x.shape = ", x.shape)
 
 				else:
 					if (layers[1] > 0):
@@ -223,8 +210,6 @@ class Darknet(nn.Module):
 					map1 = outputs[i + layers[0]]
 					map2 = outputs[i + layers[1]]
 
-					print("map1.shape  ", map1.shape, '\n', "map2.shape = ", map2.shape)
-
 					x = torch.cat((map1, map2), 1)
 
 			elif (module_type == 'shortcut'):
@@ -232,7 +217,6 @@ class Darknet(nn.Module):
 				x = outputs[i - 1] + outputs[i + from_]
 
 			elif (module_type == 'yolo'):
-				print("module # ", i, module_type)
 				anchors = self.module_list[i][0].anchors
 				input_dim = int(self.net_info['height'])
 
@@ -240,7 +224,6 @@ class Darknet(nn.Module):
 
 				x = x.data
 
-				print("YOLO. x.shape = ", i, x.shape)
 				x = predict_transform(x, input_dim, anchors, num_classes, CUDA)
 
 				if not write:
@@ -355,7 +338,7 @@ if pred is not 0:
 else:
 	print("There is no detections")"""
 
-model = Darknet("cfg/yolov3-tiny.cfg")
+"""model = Darknet("cfg/yolov3-tiny.cfg")
 print(model)
 model.load_weights("model/yolov3-tiny.weights")
 inp = get_test_input()
@@ -368,4 +351,4 @@ pred = write_result(pred, 0.6, 80, 0.5)
 if pred is not 0:
 	print("Pred shape after NMS: ", pred.shape)
 else:
-	print("There is no detections")
+	print("There is no detections")"""
